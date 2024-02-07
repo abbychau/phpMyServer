@@ -12,22 +12,26 @@ import (
 	"sync"
 	"syscall"
 )
-
+var routingPoint string
 func main() {
 
 	// Parse the command-line flags
 	var processPort int
 	var balancerPort int
 	var numberOfProcesses int
+	
 	flag.IntVar(&processPort, "process-port", 11000, "port for the processes")
 	flag.IntVar(&balancerPort, "balancer-port", 9090, "port for the load balancer")
 	flag.IntVar(&numberOfProcesses, "number-of-processes", 5, "number of processes to start")
+	flag.StringVar(&routingPoint, "routing-point", "index.php", "routing point")
 	flag.Parse()
 
-	//print all flags
+	//./phpmyserver -process-port=11000 -balancer-port=9090 -number-of-processes=5 -routing-point=index.php
+
 	fmt.Printf("process-port: %d\n", processPort)
 	fmt.Printf("balancer-port: %d\n", balancerPort)
 	fmt.Printf("number-of-processes: %d\n", numberOfProcesses)
+	fmt.Printf("routing-point: %s\n", routingPoint)
 
 	// Create a slice of processes
 	processes := make([]*Process, numberOfProcesses)
@@ -44,9 +48,6 @@ func main() {
 		go p.Start(&wg)
 	}
 
-	// Wait for the processes to start
-	// wg.Wait()
-
 	// Create a channel to receive signals
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
@@ -62,8 +63,6 @@ func main() {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		//fmt.Printf("Target URL: %s", targetURL)
-		// print full url
 		fmt.Printf("Request URL: %s%s\n", targetURL, r.URL.String())
 
 		// Create a proxy
@@ -108,7 +107,7 @@ func (p *Process) Start(wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	for {
-		p.cmd = exec.Command("php", "-S", fmt.Sprintf("localhost:%d", p.Port))
+		p.cmd = exec.Command("php", "-S", fmt.Sprintf("localhost:%d", p.Port), routingPoint)
 		err := p.cmd.Start()
 		if err == nil {
 			fmt.Printf("Process started on port %d\n", p.Port)
